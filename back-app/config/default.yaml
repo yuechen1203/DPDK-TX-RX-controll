@@ -1,0 +1,100 @@
+# Authentication
+# 系统展示名称。
+system_name: "DPDK TX/RX 控制台"
+
+# 前端登录密钥；前端会使用 md5(secret + ":" + challenge) 发送摘要。
+AUTH_TOKEN: "110110"
+
+# Control API
+# 后端 HTTP 控制接口监听地址，格式为 "ip:port"。
+HTTP_LISTEN: "0.0.0.0:8080"
+# 是否启用 TLS；当前 HTTP socket 骨架预留该字段，默认不启用。
+ENABLE_TLS: false
+# TLS 证书文件路径；ENABLE_TLS=true 时使用，当前版本预留。
+TLS_CERT_FILE: ""
+# TLS 私钥文件路径；ENABLE_TLS=true 时使用，当前版本预留。
+TLS_KEY_FILE: ""
+
+# PCAP browser and parser
+# PCAP 文件根目录；前端 PCAP 页面和创建 stream 时只能选择该目录下的文件。
+PCAP_ROOT: "/home/huang/pcap"
+# 是否递归扫描 PCAP_ROOT 的子目录。
+PCAP_RECURSIVE: false
+# 单次扫描最多解析的 PCAP 文件数量，避免目录过大导致接口阻塞太久。
+PCAP_MAX_SCAN_FILES: 1024
+# 允许展示和解析的 PCAP 文件扩展名。
+PCAP_EXTENSIONS: [".pcap", ".pcapng"]
+
+# DPDK EAL
+# DPDK EAL 可用 lcore 列表，格式示例："0-7" 或 "0,2,4-7"。
+CORE_LIST: "0-15"
+# main lcore；控制面运行在该核上，不参与发包 worker 分配。
+MAIN_LCORE: 0
+# DPDK memory channel 数，对应 EAL 的 -n 参数。
+MEM_CHANNELS: 2
+# DPDK file-prefix，用于区分多进程共享文件和 hugepage 资源。
+FILE_PREFIX: "dpdk-tx"
+# DPDK proc-type，通常为 primary。
+PROC_TYPE: "primary"
+
+# Device list. Empty means auto-discover PCI devices bound to vfio-pci.
+# DPDK 设备列表；非空时等价于 EAL -a <pci> 列表，空数组时扫描 vfio-pci 设备。
+device_list: ["0002:01:00.1", "0002:01:00.2"]
+
+# Port and queue configuration
+# RX ring 大小；所有 RX 收包线程的 RX queue 共用该 descriptor 配置。
+rx_ring_size: 1024
+# 每个 TX queue 的 ring descriptor 数量。
+tx_ring_size: 1024
+# 每个端口预分配的 TX queue 数；0 表示按 worker lcore 数自动计算。
+tx_queue_per_port: 0
+# 每个端口预分配的 RX queue 数；0 表示按 worker lcore 数自动计算。
+rx_queue_per_port: 0
+
+# Mbuf and burst configuration
+# DPDK mbuf pool 总 mbuf 数量。
+mbuf_pool_size: 262143
+# 每个 lcore 的 mbuf cache 大小。
+mbuf_cache_size: 512
+# 每个 worker 单次 rte_eth_tx_burst/rte_eth_rx_burst 最多处理的包数。
+max_burst: 32
+
+# Rate limiter
+# 速率计算口径；wire 表示按 L2 长度加 preamble/IFG，l2 表示只按 L2 帧长。
+RATE_ACCOUNTING: "wire"
+
+# Runtime statistics
+# 前端和后端统计建议刷新间隔，单位毫秒。
+stats_interval_ms: 3000
+
+# DPDK engine. Requires building with: cmake -S . -B build-dpdk -DENABLE_DPDK=ON
+# 引擎类型；当前实现使用 dpdk，字段为后续其他引擎预留。
+TX_ENGINE_MODE: "dpdk"
+
+# RX pcap dump
+# RX stream 开启 pcap_dump 后的保存目录；每个 RX worker 单独生成一个 pcap 文件。
+rx_pcap_dump_root: "/home/huang/rx_pcap"
+# 单个 RX dump 文件最大大小，单位 MB；0 表示不轮转。
+rx_pcap_max_file_mb: 0
+# RX dump 写入失败时是否停止对应 stream。
+rx_pcap_stop_on_error: true
+
+# Stream history database. Uses MariaDB/MySQL protocol.
+# 是否启用历史 stream 数据库持久化。
+DB_ENABLED: true
+# 数据库地址，格式为 "ip:port"。
+DB_ENDPOINT: "192.168.0.213:1800"
+# 数据库用户名。
+DB_USER: "gxt_user"
+# 数据库密码。
+DB_PASSWORD: "guangxin"
+# 数据库名；数据库本身需要提前创建。
+DB_NAME: "gxtest"
+# TX 历史 stream 表名；表不存在时后端会自动创建。
+db_tx_stream_table: "tx_stream_history"
+# RX 历史 stream 表名；表不存在时后端会自动创建。
+db_rx_stream_table: "rx_stream_history"
+
+# Demo option. Keep false for real resource discovery.
+# 是否启动时创建 demo stream；真实使用应保持 false。
+MOCK_INITIAL_STREAMS: false
