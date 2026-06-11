@@ -27,9 +27,9 @@ PCAP_EXTENSIONS: [".pcap", ".pcapng"]
 
 # DPDK EAL
 # DPDK EAL 可用 lcore 列表，格式示例："0-7" 或 "0,2,4-7"。
-CORE_LIST: "0-15"
+CORE_LIST: "16-23"
 # main lcore；控制面运行在该核上，不参与发包 worker 分配。
-MAIN_LCORE: 0
+MAIN_LCORE: 16
 # DPDK memory channel 数，对应 EAL 的 -n 参数。
 MEM_CHANNELS: 2
 # DPDK file-prefix，用于区分多进程共享文件和 hugepage 资源。
@@ -39,7 +39,7 @@ PROC_TYPE: "primary"
 
 # Device list. Empty means auto-discover PCI devices bound to vfio-pci.
 # DPDK 设备列表；非空时等价于 EAL -a <pci> 列表，空数组时扫描 vfio-pci 设备。
-device_list: ["0002:01:00.1", "0002:01:00.2"]
+device_list: ["0002:01:00.2"]
 
 # Port and queue configuration
 # RX ring 大小；所有 RX 收包线程的 RX queue 共用该 descriptor 配置。

@@ -67,6 +67,7 @@ std::vector<int> split_total_rate_mbps(int total_rate_mbps, int count) {
 
     total_rate_mbps = std::max(0, total_rate_mbps);
     const int base = total_rate_mbps / count;
+    
     int remainder = total_rate_mbps % count;
     rates.reserve(static_cast<size_t>(count));
     for (int i = 0; i < count; ++i) {
@@ -165,7 +166,13 @@ std::string history_config_summary_json(const std::string& config_json) {
     out << ",";
     append_json_bool_field(out, "pcap_dump_enabled", extract_json_bool(config_json, "pcap_dump_enabled", false));
     out << ",";
+    append_json_bool_field(out, "loop", extract_json_bool(config_json, "loop", true));
+    out << ",";
     append_json_string_field(out, "pcap_path", extract_json_string(config_json, "pcap_path"));
+    out << ",";
+    append_json_string_field(out, "l3", extract_json_string(config_json, "l3", "IPv4"));
+    out << ",";
+    append_json_string_field(out, "l4", extract_json_string(config_json, "l4", "UDP"));
     out << ",";
     append_json_string_field(out, "src_mac", extract_json_string(config_json, "src_mac", "02:00:00:00:00:01"));
     out << ",";
@@ -1118,7 +1125,8 @@ std::string RuntimeState::streams_json() {
         out << "\"dump_files\":" << s.dump_files << ",";
         out << "\"dump_errors\":" << s.dump_errors << ",";
         out << "\"pcap_dump_enabled\":" << (s.pcap_dump_enabled ? "true" : "false") << ",";
-        out << "\"pcap_dump_dir\":" << quote(s.pcap_dump_dir);
+        out << "\"pcap_dump_dir\":" << quote(s.pcap_dump_dir) << ",";
+        out << "\"config_summary\":" << history_config_summary_json(s.config_json);
         out << "}";
     }
     out << "]}";

@@ -161,49 +161,81 @@
                   </div>
                 </div>
 
-                <div class="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>名称</th>
-                        <th>类型</th>
-                        <th>状态</th>
-                        <th>模式</th>
-                        <th>设备</th>
-                        <th>Core</th>
-                        <th>每核目标</th>
-                        <th>突发区</th>
-                        <th>目标总计</th>
-                        <th>实际带宽</th>
-                        <th>实际速率</th>
-                        <th>累计</th>
-                        <th>操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="stream in streams" :key="stream.id">
-                        <td><strong>{{ stream.name }}</strong></td>
-                        <td><span :class="['badge', streamDirection(stream) === 'rx' ? 'idle' : 'ok']"><i></i>{{ streamDirection(stream).toUpperCase() }}</span></td>
-                        <td><span :class="['badge', stream.status === 'running' ? 'ok' : 'warn']"><i></i>{{ stream.status }}</span></td>
-                        <td>{{ streamDirection(stream) === 'rx' ? `收包${stream.pcap_dump_enabled ? ' / dump' : ''}` : (stream.mode === 'pcap' ? 'PCAP 循环' : '构造包') }}</td>
-                        <td>{{ streamDirection(stream) === 'rx' ? stream.rx_port : stream.tx_port }}</td>
-                        <td>{{ stream.cores.join(', ') }}</td>
-                        <td>{{ streamDirection(stream) === 'rx' ? '-' : formatWorkerRates(stream) }}</td>
-                        <td>{{ streamDirection(stream) === 'rx' ? '-' : formatWorkerBursts(stream) }}</td>
-                        <td>{{ streamDirection(stream) === 'rx' ? '-' : `${formatNumber(streamTargetTotal(stream))} Mbps` }}</td>
-                        <td>{{ formatNumber(stream.actual_mbps) }} Mbps</td>
-                        <td>{{ formatNumber(stream.actual_pps) }} pps</td>
-                        <td>{{ formatNumber(stream.total_gb, 2) }} GB</td>
-                        <td>
-                          <div class="actions">
-                            <button v-if="stream.status !== 'running'" class="btn primary" type="button" :disabled="!txEngineReady" @click="startStream(stream.id)"><Play :size="15" />开始</button>
-                            <button v-else class="btn warn" type="button" @click="stopStream(stream.id)"><Square :size="15" />停止</button>
-                            <button class="btn danger" type="button" @click="deleteStream(stream.id)"><Trash2 :size="15" />删除</button>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div class="stream-card-list">
+                  <article v-for="stream in streams" :key="stream.id" class="stream-card">
+                    <div class="stream-card-head">
+                      <div class="stream-title-block">
+                        <strong>{{ stream.name }}</strong>
+                        <span>{{ streamDirection(stream) === 'rx' ? stream.rx_port : stream.tx_port }}</span>
+                      </div>
+                      <div class="stream-badges">
+                        <span :class="['badge', streamDirection(stream) === 'rx' ? 'idle' : 'ok']"><i></i>{{ streamDirection(stream).toUpperCase() }}</span>
+                        <span :class="['badge', stream.status === 'running' ? 'ok' : 'warn']"><i></i>{{ stream.status }}</span>
+                        <span class="badge idle"><i></i>{{ streamModeText(stream) }}</span>
+                      </div>
+                      <div class="stream-card-actions">
+                        <button class="btn outline" type="button" :title="streamTooltip(stream)" @click="openStreamDetails(stream)"><Info :size="15" />详情</button>
+                        <button v-if="stream.status !== 'running'" class="btn primary" type="button" :disabled="!txEngineReady" @click="startStream(stream.id)"><Play :size="15" />开始</button>
+                        <button v-else class="btn warn" type="button" @click="stopStream(stream.id)"><Square :size="15" />停止</button>
+                        <button class="btn danger" type="button" @click="deleteStream(stream.id)"><Trash2 :size="15" />删除</button>
+                      </div>
+                    </div>
+
+                    <div class="stream-stat-grid">
+                      <div class="stream-stat">
+                        <span>目标总计</span>
+                        <strong>{{ streamDirection(stream) === 'rx' ? '-' : `${formatNumber(streamTargetTotal(stream))} Mbps` }}</strong>
+                      </div>
+                      <div class="stream-stat">
+                        <span>实际带宽</span>
+                        <strong>{{ formatNumber(stream.actual_mbps) }} Mbps</strong>
+                      </div>
+                      <div class="stream-stat">
+                        <span>实际速率</span>
+                        <strong>{{ formatNumber(stream.actual_pps) }} pps</strong>
+                      </div>
+                      <div class="stream-stat">
+                        <span>累计</span>
+                        <strong>{{ formatNumber(stream.total_gb, 2) }} GB</strong>
+                      </div>
+                    </div>
+
+                    <div class="stream-resource-grid">
+                      <section class="stream-resource-block">
+                        <h3>Core</h3>
+                        <div class="resource-pill-list">
+                          <span v-for="item in coreItems(stream)" :key="item.key" class="resource-pill">
+                            <strong>{{ item.label }}</strong>
+                            <em>{{ item.sub }}</em>
+                          </span>
+                        </div>
+                      </section>
+                      <section class="stream-resource-block">
+                        <h3>每核目标</h3>
+                        <div v-if="streamDirection(stream) !== 'rx'" class="resource-pill-list">
+                          <span v-for="item in workerRateItems(stream)" :key="item.key" class="resource-pill">
+                            <strong>{{ item.label }}</strong>
+                            <em>{{ item.value }}</em>
+                          </span>
+                        </div>
+                        <span v-else class="muted">RX stream 无发包目标</span>
+                      </section>
+                      <section class="stream-resource-block">
+                        <h3>突发区</h3>
+                        <div v-if="streamDirection(stream) !== 'rx'" class="resource-pill-list">
+                          <span v-for="item in workerBurstItems(stream)" :key="item.key" class="resource-pill">
+                            <strong>{{ item.label }}</strong>
+                            <em>{{ item.value }}</em>
+                          </span>
+                        </div>
+                        <span v-else class="muted">-</span>
+                      </section>
+                    </div>
+                  </article>
+
+                  <div v-if="!streams.length" class="stream-empty">
+                    暂无运行中的 stream
+                  </div>
                 </div>
               </div>
             </div>
@@ -696,6 +728,30 @@
         </template>
       </section>
     </main>
+
+    <div v-if="selectedStream" class="modal-backdrop" @click.self="closeStreamDetails">
+      <section class="modal-panel stream-detail-modal" role="dialog" aria-modal="true" aria-labelledby="stream-detail-title">
+        <div class="modal-head">
+          <div>
+            <h2 id="stream-detail-title">{{ selectedStream.name }}</h2>
+            <p>{{ streamDirection(selectedStream).toUpperCase() }} / {{ streamModeText(selectedStream) }}</p>
+          </div>
+          <button class="btn outline icon-btn" type="button" @click="closeStreamDetails"><X :size="16" /></button>
+        </div>
+
+        <div class="modal-body">
+          <section v-for="group in streamDetailGroups(selectedStream)" :key="group.title" class="detail-section">
+            <h3>{{ group.title }}</h3>
+            <div class="detail-list">
+              <div v-for="row in group.rows" :key="row.label" class="detail-row">
+                <span>{{ row.label }}</span>
+                <strong>{{ row.value }}</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -711,6 +767,7 @@ import {
   FileStack,
   GitBranch,
   HardDrive,
+  Info,
   KeyRound,
   LockKeyhole,
   LogIn,
@@ -729,7 +786,8 @@ import {
   Square,
   TimerReset,
   Trash2,
-  Waves
+  Waves,
+  X
 } from '@lucide/vue'
 import { BackendConnectionError, api, setAuthToken } from './api/client'
 
@@ -776,6 +834,7 @@ const reconnecting = ref(false)
 const realtimeRefreshing = ref(false)
 const sessionToken = ref('')
 const createPanel = ref(null)
+const selectedStream = ref(null)
 
 const runtime = ref({})
 const devices = ref([])
@@ -1012,6 +1071,30 @@ function formatWorkerBursts(stream) {
   return bursts.map((bytes, index) => `核${stream.cores?.[index] ?? index + 1}:${formatNumber(bytes)}B`).join(' / ')
 }
 
+function coreItems(stream) {
+  return (stream.cores || []).map((core, index) => ({
+    key: `${stream.id || stream.name}-core-${index}`,
+    label: `lcore ${core}`,
+    sub: stream.queues?.[index] !== undefined ? `queue ${stream.queues[index]}` : 'queue -'
+  }))
+}
+
+function workerRateItems(stream) {
+  return streamRates(stream).map((rate, index) => ({
+    key: `${stream.id || stream.name}-rate-${index}`,
+    label: `核 ${stream.cores?.[index] ?? index + 1}`,
+    value: `${formatNumber(rate)} Mbps`
+  }))
+}
+
+function workerBurstItems(stream) {
+  return streamBursts(stream).map((bytes, index) => ({
+    key: `${stream.id || stream.name}-burst-${index}`,
+    label: `核 ${stream.cores?.[index] ?? index + 1}`,
+    value: `${formatNumber(bytes)} B`
+  }))
+}
+
 function streamDirection(stream) {
   return stream.direction === 'rx' ? 'rx' : 'tx'
 }
@@ -1030,7 +1113,36 @@ function sequenceModeLabel(value) {
 }
 
 function historyConfig(item) {
-  if (item.config_summary) return item.config_summary
+  const defaults = {
+    direction: 'tx',
+    pcap_path: '',
+    loop: true,
+    rx_port: '',
+    pcap_dump_enabled: false,
+    l3: 'IPv4',
+    l4: 'UDP',
+    src_mac: '02:00:00:00:00:01',
+    dst_mac: '02:00:00:00:00:02',
+    src_ip_addr: '192.168.0.1',
+    src_ip_mask: 32,
+    src_ip_mode: 'fixed',
+    src_ip_step: 1,
+    dst_ip_addr: '192.168.0.2',
+    dst_ip_mask: 32,
+    dst_ip_mode: 'fixed',
+    dst_ip_step: 1,
+    src_port_start: 10000,
+    src_port_end: 10000,
+    src_port_mode: 'increment',
+    src_port_step: 1,
+    dst_port_start: 53,
+    dst_port_end: 53,
+    dst_port_mode: 'increment',
+    dst_port_step: 1,
+    payload_len: 64,
+    checksum_enabled: true
+  }
+  if (item.config_summary) return { ...defaults, ...item.config_summary }
   let parsed = {}
   try {
     parsed = JSON.parse(item.config_json || '{}')
@@ -1039,9 +1151,14 @@ function historyConfig(item) {
   }
   const construct = parsed.construct || parsed
   return {
+    ...defaults,
+    direction: parsed.direction || construct.direction || 'tx',
     pcap_path: parsed.pcap_path || construct.pcap_path || '',
+    loop: parsed.loop ?? construct.loop ?? true,
     rx_port: parsed.rx_port || construct.rx_port || '',
     pcap_dump_enabled: parsed.pcap_dump_enabled ?? construct.pcap_dump_enabled ?? false,
+    l3: construct.l3 || parsed.l3 || 'IPv4',
+    l4: construct.l4 || parsed.l4 || 'UDP',
     src_mac: construct.src_mac || '02:00:00:00:00:01',
     dst_mac: construct.dst_mac || '02:00:00:00:00:02',
     src_ip_addr: construct.src_ip_addr || construct.src_ip || '192.168.0.1',
@@ -1060,7 +1177,8 @@ function historyConfig(item) {
     dst_port_end: construct.dst_port_end ?? 53,
     dst_port_mode: construct.dst_port_mode || 'increment',
     dst_port_step: construct.dst_port_step ?? 1,
-    payload_len: construct.payload_len ?? 64
+    payload_len: construct.payload_len ?? 64,
+    checksum_enabled: construct.checksum_enabled ?? true
   }
 }
 
@@ -1078,6 +1196,121 @@ function historyPortLine(item, side) {
   const end = config[`${side}_port_end`]
   const step = mode === 'increment' && start !== end ? ` step ${formatNumber(config[`${side}_port_step`])}` : ''
   return `${side === 'src' ? '源' : '目的'} ${start}-${end} ${sequenceModeLabel(mode)}${step}`
+}
+
+function streamConfig(stream) {
+  return historyConfig(stream || {})
+}
+
+function yesNo(value) {
+  return value ? '开启' : '关闭'
+}
+
+function streamModeText(stream) {
+  if (!stream) return '-'
+  if (streamDirection(stream) === 'rx') {
+    return stream.pcap_dump_enabled ? '收包 / pcap dump' : '收包'
+  }
+  return stream.mode === 'pcap' ? 'PCAP 循环' : '构造包'
+}
+
+function openStreamDetails(stream) {
+  selectedStream.value = stream
+}
+
+function closeStreamDetails() {
+  selectedStream.value = null
+}
+
+function streamDetailGroups(stream) {
+  if (!stream) return []
+  const config = streamConfig(stream)
+  const direction = streamDirection(stream)
+  const groups = [
+    {
+      title: '基础信息',
+      rows: [
+        { label: '名称', value: stream.name || '-' },
+        { label: '类型', value: direction.toUpperCase() },
+        { label: '状态', value: stream.status || '-' },
+        { label: '模式', value: streamModeText(stream) },
+        { label: '设备', value: direction === 'rx' ? (stream.rx_port || '-') : (stream.tx_port || '-') },
+        { label: 'Core', value: (stream.cores || []).map((core) => `lcore ${core}`).join(', ') || '-' },
+        { label: 'Queue', value: (stream.queues || []).join(', ') || '-' }
+      ]
+    }
+  ]
+
+  if (direction === 'rx') {
+    groups.push({
+      title: 'RX 配置',
+      rows: [
+        { label: 'pcap dump', value: yesNo(stream.pcap_dump_enabled || config.pcap_dump_enabled) },
+        { label: '保存目录', value: stream.pcap_dump_dir || config.pcap_dump_dir || '-' },
+        { label: 'dump 文件', value: `${formatNumber(stream.dump_files)} 个` },
+        { label: 'dump 错误', value: formatNumber(stream.dump_errors) }
+      ]
+    })
+    return groups
+  }
+
+  groups.push({
+    title: 'Worker 发包',
+    rows: [
+      { label: '每核目标', value: formatWorkerRates(stream) || '-' },
+      { label: '突发区', value: formatWorkerBursts(stream) || '-' },
+      { label: '目标总计', value: `${formatNumber(streamTargetTotal(stream))} Mbps` }
+    ]
+  })
+
+  if (stream.mode === 'pcap') {
+    groups.push({
+      title: 'PCAP 配置',
+      rows: [
+        { label: 'PCAP 文件', value: config.pcap_path || '-' },
+        { label: '循环发送', value: yesNo(config.loop) }
+      ]
+    })
+    return groups
+  }
+
+  groups.push(
+    {
+      title: '协议与 MAC',
+      rows: [
+        { label: 'IP 类型', value: config.l3 || '-' },
+        { label: '传输层', value: config.l4 || '-' },
+        { label: 'Checksum', value: yesNo(config.checksum_enabled) },
+        { label: '源 MAC', value: config.src_mac || '-' },
+        { label: '目的 MAC', value: config.dst_mac || '-' }
+      ]
+    },
+    {
+      title: 'IP 范围',
+      rows: [
+        { label: '源 IP', value: historyIpLine(stream, 'src') },
+        { label: '目的 IP', value: historyIpLine(stream, 'dst') }
+      ]
+    },
+    {
+      title: '端口与 Payload',
+      rows: [
+        { label: '源端口', value: historyPortLine(stream, 'src') },
+        { label: '目的端口', value: historyPortLine(stream, 'dst') },
+        { label: 'Payload 长度', value: `${formatNumber(config.payload_len)} B` }
+      ]
+    }
+  )
+  return groups
+}
+
+function streamTooltip(stream) {
+  return streamDetailGroups(stream)
+    .flatMap((group) => [
+      `[${group.title}]`,
+      ...group.rows.map((row) => `${row.label}: ${row.value}`)
+    ])
+    .join('\n')
 }
 
 function mergeStreamStats(streamStats = []) {
