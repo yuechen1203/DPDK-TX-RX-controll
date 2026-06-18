@@ -498,43 +498,46 @@
               <h2>设备口实时统计</h2>
               <button class="btn danger" type="button" @click="resetStats(null)"><RotateCcw :size="16" />Reset 全部</button>
             </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>设备</th>
-                    <th>Port</th>
-                    <th>实时发送速率</th>
-                    <th>TX PPS</th>
-                    <th>累计发送</th>
-                    <th>TX packets</th>
-                    <th>TX drop</th>
-                    <th>实时收包带宽</th>
-                    <th>RX PPS</th>
-                    <th>累计接收</th>
-                    <th>RX packets</th>
-                    <th>RX drop/error</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in stats" :key="row.port_id">
-                    <td><strong>{{ row.pci }}</strong></td>
-                    <td>{{ row.port_id }}</td>
-                    <td>{{ formatNumber(row.tx_mbps) }} Mbps</td>
-                    <td>{{ formatNumber(row.tx_mpps * 1000000) }} pps</td>
-                    <td>{{ formatNumber(row.total_tb * 1024, 2) }} GB</td>
-                    <td>{{ formatNumber(row.tx_packets_m, 1) }} M</td>
-                    <td>{{ formatNumber(row.tx_drops) }}</td>
-                    <td>{{ formatNumber(row.rx_mbps) }} Mbps</td>
-                    <td>{{ formatNumber(row.rx_mpps * 1000000) }} pps</td>
-                    <td>{{ formatNumber(row.rx_total_gb, 2) }} GB</td>
-                    <td>{{ formatNumber(row.rx_packets_m, 1) }} M</td>
-                    <td>{{ formatNumber(row.rx_drops) }} / {{ formatNumber(row.rx_errors) }}</td>
-                    <td><button class="btn outline" type="button" @click="resetStats(row.port_id)"><RotateCcw :size="15" />Reset</button></td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="port-stat-list">
+              <article v-for="row in stats" :key="row.port_id" class="port-stat-card">
+                <div class="port-stat-head">
+                  <div>
+                    <span>Port {{ row.port_id }}</span>
+                    <strong>{{ row.pci }}</strong>
+                  </div>
+                  <button class="btn outline" type="button" @click="resetStats(row.port_id)"><RotateCcw :size="15" />Reset</button>
+                </div>
+                <div class="port-stat-lanes">
+                  <section class="port-stat-lane tx-lane">
+                    <div class="lane-title">
+                      <span>TX</span>
+                      <strong>{{ formatNumber(row.tx_mbps) }} Mbps</strong>
+                    </div>
+                    <div class="lane-metrics">
+                      <div class="lane-metric primary"><span>实时发送速率</span><strong>{{ formatNumber(row.tx_mbps) }} Mbps</strong></div>
+                      <div class="lane-metric"><span>TX PPS</span><strong>{{ formatNumber(row.tx_mpps * 1000000) }} pps</strong></div>
+                      <div class="lane-metric"><span>累计发送</span><strong>{{ formatNumber(row.total_tb * 1024, 2) }} GB</strong></div>
+                      <div class="lane-metric"><span>TX packets</span><strong>{{ formatNumber(row.tx_packets) }}</strong></div>
+                      <div class="lane-metric warn"><span>Burst drop</span><strong>{{ formatNumber(row.tx_drops) }}</strong></div>
+                      <div class="lane-metric warn"><span>No mbuf</span><strong>{{ formatNumber(row.tx_nombuf) }}</strong></div>
+                    </div>
+                  </section>
+                  <section class="port-stat-lane rx-lane">
+                    <div class="lane-title">
+                      <span>RX</span>
+                      <strong>{{ formatNumber(row.rx_mbps) }} Mbps</strong>
+                    </div>
+                    <div class="lane-metrics">
+                      <div class="lane-metric primary"><span>实时收包带宽</span><strong>{{ formatNumber(row.rx_mbps) }} Mbps</strong></div>
+                      <div class="lane-metric"><span>RX PPS</span><strong>{{ formatNumber(row.rx_mpps * 1000000) }} pps</strong></div>
+                      <div class="lane-metric"><span>累计接收</span><strong>{{ formatNumber(row.rx_total_gb, 2) }} GB</strong></div>
+                      <div class="lane-metric"><span>RX packets</span><strong>{{ formatNumber(row.rx_packets) }}</strong></div>
+                      <div class="lane-metric warn"><span>RX drop</span><strong>{{ formatNumber(row.rx_drops) }}</strong></div>
+                      <div class="lane-metric warn"><span>RX error</span><strong>{{ formatNumber(row.rx_errors) }}</strong></div>
+                    </div>
+                  </section>
+                </div>
+              </article>
             </div>
           </section>
         </template>

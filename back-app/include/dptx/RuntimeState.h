@@ -136,11 +136,14 @@ struct PortStats {
     int tx_mbps = 0;
     double tx_mpps = 0;
     double total_tb = 0;
+    uint64_t tx_packets = 0;
     double tx_packets_m = 0;
     long tx_drops = 0;
+    long tx_nombuf = 0;
     int rx_mbps = 0;
     double rx_mpps = 0.0;
     double rx_total_gb = 0.0;
+    uint64_t rx_packets = 0;
     double rx_packets_m = 0.0;
     long rx_drops = 0;
     long rx_errors = 0;

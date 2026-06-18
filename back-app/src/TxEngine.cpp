@@ -1055,7 +1055,7 @@ public:
 
         status_.ready = true;
         status_.status = "running";
-        status_.message = "DPDK TX/RX 引擎已就绪，统计来自 rte_eth_stats 和 worker 计数";
+        status_.message = "DPDK TX/RX 引擎已就绪，统计来自软件 worker 计数";
         initialized_ = true;
         return true;
     }
@@ -1203,24 +1203,40 @@ public:
 
     bool delete_stream(int stream_id, std::string& error) override {
         std::lock_guard<std::mutex> lock(mutex_);
-        stop_stream_locked(stream_id);
-        streams_.erase(stream_id);
+        auto iter = streams_.find(stream_id);
+        if (iter != streams_.end()) {
+            stop_stream_locked(stream_id);
+            archive_stream_totals_locked(*iter->second);
+            streams_.erase(iter);
+        }
         error.clear();
         return true;
     }
 
     void reset_stats(std::optional<int> port_id) override {
         std::lock_guard<std::mutex> lock(mutex_);
+        const auto totals = collect_port_totals_locked();
+        const auto now = std::chrono::steady_clock::now();
         for (auto& item : ports_) {
             if (port_id && item.second.device.port_id != *port_id) {
                 continue;
             }
             rte_eth_stats_reset(static_cast<uint16_t>(item.first));
-            item.second.last_tx_bytes = 0;
-            item.second.last_tx_packets = 0;
-            item.second.last_rx_bytes = 0;
-            item.second.last_rx_packets = 0;
-            item.second.last_sample = std::chrono::steady_clock::now();
+            const auto current = totals.find(item.first);
+            const auto& total = current == totals.end() ? zero_port_totals_ : current->second;
+            item.second.reset_tx_bytes = total.tx_bytes;
+            item.second.reset_tx_packets = total.tx_packets;
+            item.second.reset_tx_drops = total.tx_drops;
+            item.second.reset_rx_bytes = total.rx_bytes;
+            item.second.reset_rx_packets = total.rx_packets;
+            item.second.reset_rx_drops = total.rx_drops;
+            item.second.reset_rx_errors = total.rx_errors;
+            item.second.reset_rx_nombuf = total.rx_nombuf;
+            item.second.last_tx_bytes = total.tx_bytes;
+            item.second.last_tx_packets = total.tx_packets;
+            item.second.last_rx_bytes = total.rx_bytes;
+            item.second.last_rx_packets = total.rx_packets;
+            item.second.last_sample = now;
         }
     }
 
@@ -1238,6 +1254,7 @@ public:
         }
 
         const auto now = std::chrono::steady_clock::now();
+        const auto port_totals = collect_port_totals_locked();
         for (auto& row : ports) {
             auto port = find_port_runtime_locked(row.pci);
             if (!port) {
@@ -1247,31 +1264,29 @@ public:
                 row.rx_mpps = 0;
                 continue;
             }
-            struct rte_eth_stats stats{};
-            if (rte_eth_stats_get(static_cast<uint16_t>(port->device.port_id), &stats) != 0) {
-                continue;
-            }
+            const auto current = port_totals.find(port->device.port_id);
+            const auto& total = current == port_totals.end() ? zero_port_totals_ : current->second;
             const double elapsed = std::max(0.001, std::chrono::duration<double>(now - port->last_sample).count());
-            const uint64_t tx_byte_delta = stats.obytes >= port->last_tx_bytes ? stats.obytes - port->last_tx_bytes : 0;
-            const uint64_t tx_packet_delta = stats.opackets >= port->last_tx_packets ? stats.opackets - port->last_tx_packets : 0;
-            const uint64_t rx_byte_delta = stats.ibytes >= port->last_rx_bytes ? stats.ibytes - port->last_rx_bytes : 0;
-            const uint64_t rx_packet_delta = stats.ipackets >= port->last_rx_packets ? stats.ipackets - port->last_rx_packets : 0;
+            const uint64_t tx_byte_delta = total.tx_bytes >= port->last_tx_bytes ? total.tx_bytes - port->last_tx_bytes : 0;
+            const uint64_t tx_packet_delta = total.tx_packets >= port->last_tx_packets ? total.tx_packets - port->last_tx_packets : 0;
+            const uint64_t rx_byte_delta = total.rx_bytes >= port->last_rx_bytes ? total.rx_bytes - port->last_rx_bytes : 0;
+            const uint64_t rx_packet_delta = total.rx_packets >= port->last_rx_packets ? total.rx_packets - port->last_rx_packets : 0;
             row.tx_mbps = static_cast<int>(std::llround((static_cast<double>(tx_byte_delta) * 8.0) / elapsed / 1000000.0));
             row.tx_mpps = (static_cast<double>(tx_packet_delta) / elapsed) / 1000000.0;
-            row.total_tb = static_cast<double>(stats.obytes) / 1024.0 / 1024.0 / 1024.0 / 1024.0;
-            row.tx_packets_m = static_cast<double>(stats.opackets) / 1000000.0;
-            row.tx_drops = static_cast<long>(stats.oerrors);
+            row.total_tb = static_cast<double>(total.tx_bytes >= port->reset_tx_bytes ? total.tx_bytes - port->reset_tx_bytes : 0) / 1024.0 / 1024.0 / 1024.0 / 1024.0;
+            row.tx_packets_m = static_cast<double>(total.tx_packets >= port->reset_tx_packets ? total.tx_packets - port->reset_tx_packets : 0) / 1000000.0;
+            row.tx_drops = static_cast<long>(total.tx_drops >= port->reset_tx_drops ? total.tx_drops - port->reset_tx_drops : 0);
             row.rx_mbps = static_cast<int>(std::llround((static_cast<double>(rx_byte_delta) * 8.0) / elapsed / 1000000.0));
             row.rx_mpps = (static_cast<double>(rx_packet_delta) / elapsed) / 1000000.0;
-            row.rx_total_gb = static_cast<double>(stats.ibytes) / 1024.0 / 1024.0 / 1024.0;
-            row.rx_packets_m = static_cast<double>(stats.ipackets) / 1000000.0;
-            row.rx_drops = static_cast<long>(stats.imissed);
-            row.rx_errors = static_cast<long>(stats.ierrors);
-            row.rx_nombuf = static_cast<long>(stats.rx_nombuf);
-            port->last_tx_bytes = stats.obytes;
-            port->last_tx_packets = stats.opackets;
-            port->last_rx_bytes = stats.ibytes;
-            port->last_rx_packets = stats.ipackets;
+            row.rx_total_gb = static_cast<double>(total.rx_bytes >= port->reset_rx_bytes ? total.rx_bytes - port->reset_rx_bytes : 0) / 1024.0 / 1024.0 / 1024.0;
+            row.rx_packets_m = static_cast<double>(total.rx_packets >= port->reset_rx_packets ? total.rx_packets - port->reset_rx_packets : 0) / 1000000.0;
+            row.rx_drops = static_cast<long>(total.rx_drops >= port->reset_rx_drops ? total.rx_drops - port->reset_rx_drops : 0);
+            row.rx_errors = static_cast<long>(total.rx_errors >= port->reset_rx_errors ? total.rx_errors - port->reset_rx_errors : 0);
+            row.rx_nombuf = static_cast<long>(total.rx_nombuf >= port->reset_rx_nombuf ? total.rx_nombuf - port->reset_rx_nombuf : 0);
+            port->last_tx_bytes = total.tx_bytes;
+            port->last_tx_packets = total.tx_packets;
+            port->last_rx_bytes = total.rx_bytes;
+            port->last_rx_packets = total.rx_packets;
             port->last_sample = now;
         }
 
@@ -1320,12 +1335,39 @@ public:
     }
 
 private:
+    struct PortTotals {
+        uint64_t tx_bytes = 0;
+        uint64_t tx_packets = 0;
+        uint64_t tx_drops = 0;
+        uint64_t rx_bytes = 0;
+        uint64_t rx_packets = 0;
+        uint64_t rx_drops = 0;
+        uint64_t rx_errors = 0;
+        uint64_t rx_nombuf = 0;
+    };
+
     struct PortRuntime {
         DeviceInfo device;
         uint64_t last_tx_bytes = 0;
         uint64_t last_tx_packets = 0;
         uint64_t last_rx_bytes = 0;
         uint64_t last_rx_packets = 0;
+        uint64_t reset_tx_bytes = 0;
+        uint64_t reset_tx_packets = 0;
+        uint64_t reset_tx_drops = 0;
+        uint64_t reset_rx_bytes = 0;
+        uint64_t reset_rx_packets = 0;
+        uint64_t reset_rx_drops = 0;
+        uint64_t reset_rx_errors = 0;
+        uint64_t reset_rx_nombuf = 0;
+        uint64_t archived_tx_bytes = 0;
+        uint64_t archived_tx_packets = 0;
+        uint64_t archived_tx_drops = 0;
+        uint64_t archived_rx_bytes = 0;
+        uint64_t archived_rx_packets = 0;
+        uint64_t archived_rx_drops = 0;
+        uint64_t archived_rx_errors = 0;
+        uint64_t archived_rx_nombuf = 0;
         std::chrono::steady_clock::time_point last_sample = std::chrono::steady_clock::now();
     };
 
@@ -1334,6 +1376,7 @@ private:
     bool initialized_ = false;
     TxEngineStatus status_;
     struct rte_mempool* pool_ = nullptr;
+    PortTotals zero_port_totals_;
     std::unordered_map<int, PortRuntime> ports_;
     std::unordered_map<int, std::unique_ptr<StreamContext>> streams_;
 
@@ -1428,7 +1471,10 @@ private:
             device.total_rx_queues = rx_queues;
             device.used_rx_queues = 0;
             device.available = true;
-            ports_[port_id] = PortRuntime{device, 0, 0, 0, 0, std::chrono::steady_clock::now()};
+            PortRuntime runtime;
+            runtime.device = device;
+            runtime.last_sample = std::chrono::steady_clock::now();
+            ports_[port_id] = std::move(runtime);
         }
 
         if (ports_.empty()) {
@@ -1498,6 +1544,11 @@ private:
         }
         context.running = true;
         context.last_bytes = 0;
+        context.last_packets = 0;
+        for (const auto& worker : context.workers) {
+            context.last_bytes += worker->counters.bytes.load(std::memory_order_relaxed);
+            context.last_packets += worker->counters.packets.load(std::memory_order_relaxed);
+        }
         context.last_sample = std::chrono::steady_clock::now();
         return true;
     }
@@ -1524,6 +1575,10 @@ private:
         context.running = true;
         context.last_bytes = 0;
         context.last_packets = 0;
+        for (const auto& worker : context.rx_workers) {
+            context.last_bytes += worker->counters.bytes.load(std::memory_order_relaxed);
+            context.last_packets += worker->counters.packets.load(std::memory_order_relaxed);
+        }
         context.last_sample = std::chrono::steady_clock::now();
         return true;
     }
@@ -1551,6 +1606,72 @@ private:
         }
         context.running = false;
         return true;
+    }
+
+    std::unordered_map<int, PortTotals> collect_port_totals_locked() const {
+        std::unordered_map<int, PortTotals> totals;
+        for (const auto& port : ports_) {
+            auto& total = totals[port.first];
+            total.tx_bytes += port.second.archived_tx_bytes;
+            total.tx_packets += port.second.archived_tx_packets;
+            total.tx_drops += port.second.archived_tx_drops;
+            total.rx_bytes += port.second.archived_rx_bytes;
+            total.rx_packets += port.second.archived_rx_packets;
+            total.rx_drops += port.second.archived_rx_drops;
+            total.rx_errors += port.second.archived_rx_errors;
+            total.rx_nombuf += port.second.archived_rx_nombuf;
+        }
+        for (const auto& item : streams_) {
+            const auto& context = *item.second;
+            if (context.direction == "rx") {
+                for (const auto& worker : context.rx_workers) {
+                    auto& total = totals[worker->port_id];
+                    total.rx_bytes += worker->counters.bytes.load(std::memory_order_relaxed);
+                    total.rx_packets += worker->counters.packets.load(std::memory_order_relaxed);
+                    total.rx_drops += worker->counters.drops.load(std::memory_order_relaxed);
+                    total.rx_errors += worker->counters.errors.load(std::memory_order_relaxed);
+                    total.rx_nombuf += worker->counters.no_mbuf.load(std::memory_order_relaxed);
+                }
+                continue;
+            }
+
+            for (const auto& worker : context.workers) {
+                auto& total = totals[worker->port_id];
+                total.tx_bytes += worker->counters.bytes.load(std::memory_order_relaxed);
+                total.tx_packets += worker->counters.packets.load(std::memory_order_relaxed);
+                total.tx_drops += worker->counters.drops.load(std::memory_order_relaxed);
+                total.tx_drops += worker->counters.no_mbuf.load(std::memory_order_relaxed);
+            }
+        }
+        return totals;
+    }
+
+    void archive_stream_totals_locked(const StreamContext& context) {
+        if (context.direction == "rx") {
+            for (const auto& worker : context.rx_workers) {
+                auto port = ports_.find(worker->port_id);
+                if (port == ports_.end()) {
+                    continue;
+                }
+                port->second.archived_rx_bytes += worker->counters.bytes.load(std::memory_order_relaxed);
+                port->second.archived_rx_packets += worker->counters.packets.load(std::memory_order_relaxed);
+                port->second.archived_rx_drops += worker->counters.drops.load(std::memory_order_relaxed);
+                port->second.archived_rx_errors += worker->counters.errors.load(std::memory_order_relaxed);
+                port->second.archived_rx_nombuf += worker->counters.no_mbuf.load(std::memory_order_relaxed);
+            }
+            return;
+        }
+
+        for (const auto& worker : context.workers) {
+            auto port = ports_.find(worker->port_id);
+            if (port == ports_.end()) {
+                continue;
+            }
+            port->second.archived_tx_bytes += worker->counters.bytes.load(std::memory_order_relaxed);
+            port->second.archived_tx_packets += worker->counters.packets.load(std::memory_order_relaxed);
+            port->second.archived_tx_drops += worker->counters.drops.load(std::memory_order_relaxed);
+            port->second.archived_tx_drops += worker->counters.no_mbuf.load(std::memory_order_relaxed);
+        }
     }
 };
 

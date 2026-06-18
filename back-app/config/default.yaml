@@ -39,7 +39,7 @@ PROC_TYPE: "primary"
 
 # Device list. Empty means auto-discover PCI devices bound to vfio-pci.
 # DPDK 设备列表；非空时等价于 EAL -a <pci> 列表，空数组时扫描 vfio-pci 设备。
-device_list: ["0002:01:00.2"]
+device_list: ["0002:01:00.1","0002:01:00.2","0002:01:00.3"]
 
 # Port and queue configuration
 # RX ring 大小；所有 RX 收包线程的 RX queue 共用该 descriptor 配置。

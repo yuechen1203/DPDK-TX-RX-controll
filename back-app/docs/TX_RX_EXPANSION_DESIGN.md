@@ -943,7 +943,7 @@ RX 新代码应该只落在：
 
 ```bash
 cmake --build back-app/build-dpdk -j
-npm --prefix front-app run build
+npm --prefix front-app-v2 run build
 ```
 
 不再使用 `back-app/build`。
@@ -983,4 +983,3 @@ npm --prefix front-app run build
 5. 历史 stream 使用不同表后，旧 `stream_history` 中已有的 TX 记录需要迁移或保留旧表读取兼容。建议 v1 仍兼容旧表读取 TX 历史，但新保存写入 `tx_stream_history`。
 6. 设置页展示数据库密码时不能展示明文，只展示 `db_password_set=true/false`。
 7. 运行中 stream 的 `mode` 字段不应再承载 RX/TX 方向。方向使用 `direction`，TX 的 PCAP/construct 使用 `tx_mode` 或继续兼容旧 `mode`。
-

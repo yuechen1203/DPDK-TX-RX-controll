@@ -18,10 +18,10 @@ cmake --build build-dpdk -j
 
 #前端
 
-cd front-app
+cd front-app-v2
 
 npm i
 
-num run dev
+npm run dev
 
 #端口是5173

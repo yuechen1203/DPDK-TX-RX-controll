@@ -868,7 +868,10 @@ void RuntimeState::initialize_cores_locked() {
 void RuntimeState::initialize_stats_locked() {
     stats_.clear();
     for (const auto& device : devices_) {
-        stats_.push_back({device.pci, device.port_id, 0, 0.0, 0.0, 0.0, 0});
+        PortStats row;
+        row.pci = device.pci;
+        row.port_id = device.port_id;
+        stats_.push_back(row);
     }
 }
 
@@ -1169,11 +1172,14 @@ std::string RuntimeState::stats_json() {
         out << "\"tx_mbps\":" << s.tx_mbps << ",";
         out << "\"tx_mpps\":" << s.tx_mpps << ",";
         out << "\"total_tb\":" << s.total_tb << ",";
+        out << "\"tx_packets\":" << s.tx_packets << ",";
         out << "\"tx_packets_m\":" << s.tx_packets_m << ",";
         out << "\"tx_drops\":" << s.tx_drops << ",";
+        out << "\"tx_nombuf\":" << s.tx_nombuf << ",";
         out << "\"rx_mbps\":" << s.rx_mbps << ",";
         out << "\"rx_mpps\":" << s.rx_mpps << ",";
         out << "\"rx_total_gb\":" << s.rx_total_gb << ",";
+        out << "\"rx_packets\":" << s.rx_packets << ",";
         out << "\"rx_packets_m\":" << s.rx_packets_m << ",";
         out << "\"rx_drops\":" << s.rx_drops << ",";
         out << "\"rx_errors\":" << s.rx_errors << ",";
@@ -1384,9 +1390,12 @@ std::string RuntimeState::reset_stats(std::optional<int> port_id) {
     for (auto& row : stats_) {
         if (!port_id || row.port_id == *port_id) {
             row.total_tb = 0;
+            row.tx_packets = 0;
             row.tx_packets_m = 0;
             row.tx_drops = 0;
+            row.tx_nombuf = 0;
             row.rx_total_gb = 0;
+            row.rx_packets = 0;
             row.rx_packets_m = 0;
             row.rx_drops = 0;
             row.rx_errors = 0;

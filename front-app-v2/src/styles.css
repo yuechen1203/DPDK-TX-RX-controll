@@ -597,6 +597,147 @@ tbody tr:hover {
   background: rgba(255, 255, 255, 0.52);
 }
 
+.port-stat-list {
+  display: grid;
+  gap: 14px;
+}
+
+.port-stat-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.86), rgba(244, 248, 250, 0.66)),
+    rgba(255, 255, 255, 0.72);
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+}
+
+.port-stat-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(17, 124, 138, 0.72), rgba(80, 103, 184, 0.62));
+  opacity: 0.78;
+}
+
+.port-stat-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.port-stat-head div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.port-stat-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.port-stat-head strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 780;
+  overflow-wrap: anywhere;
+}
+
+.port-stat-lanes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.port-stat-lane {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid rgba(37, 61, 72, 0.10);
+  border-radius: 16px;
+}
+
+.tx-lane {
+  background:
+    linear-gradient(135deg, rgba(232, 250, 247, 0.82), rgba(255, 255, 255, 0.58)),
+    rgba(255, 255, 255, 0.62);
+}
+
+.rx-lane {
+  background:
+    linear-gradient(135deg, rgba(238, 242, 255, 0.86), rgba(255, 255, 255, 0.58)),
+    rgba(255, 255, 255, 0.62);
+}
+
+.lane-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(37, 61, 72, 0.10);
+}
+
+.lane-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 820;
+  letter-spacing: 0.08em;
+}
+
+.lane-title strong {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 820;
+  white-space: nowrap;
+}
+
+.lane-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lane-metric {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(37, 61, 72, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.lane-metric.primary {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.lane-metric.warn {
+  background: rgba(255, 250, 240, 0.72);
+}
+
+.lane-metric span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.lane-metric strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 790;
+  overflow-wrap: anywhere;
+}
+
 .stream-card-list {
   display: grid;
   gap: 13px;
@@ -1563,6 +1704,8 @@ input[type="range"] {
   .protocol-grid,
   .ip-config-grid,
   .port-config-grid,
+  .port-stat-lanes,
+  .lane-metrics,
   .stream-stat-grid {
     grid-template-columns: 1fr;
   }
